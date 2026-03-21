@@ -1,10 +1,71 @@
 pipeline {
     agent any
+
+    environment {
+        VENV_DIR = '.venv'
+        VENV_ACTIVATE = '.venv/bin/activate'
+        LAB_DIR = 'lab2'
+    }
+
     stages {
-     stage('Hello') {
-                steps {
-                    echo 'Hello world'
+        stage('Checkout') {
+            steps { checkout scm }
+        }
+
+        stage('Setup Virtual Environment') {
+            steps {
+                script {
+                    if (!fileExists(env.VENV_DIR)) {
+                        echo 'Creating virtual environment...'
+                        sh 'python3 -m venv .venv'
+                    }
                 }
             }
-     }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                sh """
+                    . ${VENV_ACTIVATE}
+                    pip install --upgrade pip
+                    pip install -r ${LAB_DIR}/requirements.txt
+                """
+            }
+        }
+
+        stage('Create Data') {
+            steps {
+                sh ". ${VENV_ACTIVATE} && python3 ${LAB_DIR}/data_creation.py"
+            }
+        }
+
+        stage('Preprocess Data') {
+            steps {
+                sh ". ${VENV_ACTIVATE} && python3 ${LAB_DIR}/data_preprocessing.py"
+            }
+        }
+
+        stage('Train Model') {
+            steps {
+                sh ". ${VENV_ACTIVATE} && python3 ${LAB_DIR}/model_preparation.py"
+            }
+        }
+
+        stage('Test Model') {
+            steps {
+                script {
+                    def result = sh(
+                        script: ". ${VENV_ACTIVATE} && python3 ${LAB_DIR}/model_testing.py",
+                        returnStdout: true
+                    ).trim()
+                    echo result
+                }
+            }
+        }
+    }
+
+    post {
+        success { echo 'Pipeline completed successfully.' }
+        failure { echo 'Pipeline failed!' }
+    }
 }
